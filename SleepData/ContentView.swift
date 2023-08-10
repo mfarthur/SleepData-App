@@ -1,19 +1,15 @@
 import SwiftUI
 import HealthKit
-
 struct ContentView: View {
     @State private var sleepData: [Date: [String: TimeInterval]] = [:]
-
     var body: some View {
         VStack {
             Text("Sleep Data")
                 .font(.title)
-
             ForEach(sleepData.keys.sorted(by: >).prefix(5), id: \.self) { date in
                 VStack {
                     Text(dateFormatter.string(from: date))
                         .font(.headline)
-
                     if let metrics = sleepData[date] {
                         ForEach(metrics.keys.sorted(), id: \.self) { metric in
                             HStack {
@@ -35,17 +31,13 @@ struct ContentView: View {
             authorizeHealthKit()
         }
     }
-
     func authorizeHealthKit() {
         guard HKHealthStore.isHealthDataAvailable() else {
             print("HealthKit is not available on this device.")
             return
         }
-
         let healthStore = HKHealthStore()
-
         let readTypes = Set([HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!])
-
         healthStore.requestAuthorization(toShare: nil, read: readTypes) { (success, error) in
             if success {
                 print("Permission granted")
@@ -55,25 +47,19 @@ struct ContentView: View {
             }
         }
     }
-
     func retrieveSleepData(healthStore: HKHealthStore) {
         let calendar = Calendar.current
         let now = Date()
-
         for dayOffset in 0..<5 { // Only fetch data for the last 5 days
             let startDate = calendar.startOfDay(for: calendar.date(byAdding: .day, value: -dayOffset, to: now)!)
             let endDate = calendar.date(byAdding: .day, value: 1, to: startDate)!
-
             let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
-
             let query = HKSampleQuery(sampleType: HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { (query, results, error) in
                 guard let samples = results as? [HKCategorySample], error == nil else {
                     print("Failed to retrieve sleep data: \(error?.localizedDescription ?? "")")
                     return
                 }
-
                 var sleepMetrics: [String: TimeInterval] = ["Acordado": 0, "REM": 0, "Essencial": 0, "Profundo": 0]
-
                 for sample in samples {
                     let duration = sample.endDate.timeIntervalSince(sample.startDate)
                     if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue {
@@ -88,22 +74,39 @@ struct ContentView: View {
                         sleepMetrics["REM"] = (sleepMetrics["REM"] ?? 0) + duration
                     }
                 }
-
                 DispatchQueue.main.async {
                     self.sleepData[startDate] = sleepMetrics
+                    generateSleepDataJSON()
                 }
             }
-
             healthStore.execute(query)
         }
     }
-
     func formatTime(_ time: TimeInterval) -> String {
         let hours = Int(time / 3600)
         let minutes = Int((time.truncatingRemainder(dividingBy: 3600)) / 60)
         return String(format: "%02d:%02d", hours, minutes)
     }
-
+    
+    func generateSleepDataJSON() {
+           var sleepDataJSON: [String: Any] = [:]
+           for (date, metrics) in sleepData {
+               var metricsJSON: [String: String] = [:]
+               for (metric, time) in metrics {
+                   metricsJSON[metric] = formatTime(time)
+               }
+               let dateString = dateFormatter.string(from: date)
+               sleepDataJSON[dateString] = metricsJSON
+           }
+           do {
+               let jsonData = try JSONSerialization.data(withJSONObject: sleepDataJSON, options: .prettyPrinted)
+               if let jsonString = String(data: jsonData, encoding: .utf8) {
+                   print(jsonString)
+               }
+           } catch {
+               print("Error creating JSON: \(error.localizedDescription)")
+           }
+       }
     let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
@@ -111,9 +114,9 @@ struct ContentView: View {
         return formatter
     }()
 }
-
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
     }
 }
+
