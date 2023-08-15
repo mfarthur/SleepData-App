@@ -1,5 +1,7 @@
 import SwiftUI
 import HealthKit
+import Foundation
+
 struct ContentView: View {
     @State private var sleepData: [Date: [String: TimeInterval]] = [:]
     var body: some View {
@@ -89,28 +91,36 @@ struct ContentView: View {
     }
     
     func generateSleepDataJSON() {
-           var sleepDataJSON: [String: Any] = [:]
-           for (date, metrics) in sleepData {
-               var metricsJSON: [String: String] = [:]
-               for (metric, time) in metrics {
-                   metricsJSON[metric] = formatTime(time)
-               }
-               let dateString = dateFormatter.string(from: date)
-               sleepDataJSON[dateString] = metricsJSON
-           }
-           do {
-               let jsonData = try JSONSerialization.data(withJSONObject: sleepDataJSON, options: .prettyPrinted)
-               if let jsonString = String(data: jsonData, encoding: .utf8) {
-                   print(jsonString)
-               }
-           } catch {
-               print("Error creating JSON: \(error.localizedDescription)")
-           }
-       }
+        var sleepDataJSON: [[String: Any]] = []
+        
+        let isoDateFormatter = ISO8601DateFormatter()
+        
+        for (date, metrics) in sleepData {
+            var sleepEntry: [String: Any] = [:]
+            
+            sleepEntry["date"] = isoDateFormatter.string(from: date)
+            
+            for (metric, time) in metrics {
+                sleepEntry[metric] = formatTime(time)
+            }
+            
+            sleepDataJSON.append(sleepEntry)
+        }
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: sleepDataJSON, options: .prettyPrinted)
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                print(jsonString)
+            }
+        } catch {
+            print("Error creating JSON: \(error.localizedDescription)")
+        }
+    }
+    
     let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
-        formatter.timeStyle = .none
+        formatter.timeStyle = .short
         return formatter
     }()
 }
