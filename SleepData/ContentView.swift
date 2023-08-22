@@ -120,7 +120,7 @@ struct ContentView: View {
     let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
-        formatter.timeStyle = .short
+        formatter.timeStyle = .none
         return formatter
     }()
 }
